@@ -1,3 +1,23 @@
+# v0.4.4 (unreleased)
+
+## Fix
+
+- 统一文档词与 Rime 词的序号：按最终候选项列表位置依次编号 1, 2, 3...，数字选词与翻页逻辑一致（参考 pyim 的 page 设计）
+- 文档词仅在第一页显示，翻页后不再重复出现
+- 修复：数字选词后不再插入文档词（is_incomplete 为 false 时跳过），避免破坏自动上屏
+- 修复：文档词在前时，数字选词按合并后的顺序 commit（选文档词直接上屏，选 Rime 词则发送正确序号给 Rime）
+
+## Feat
+
+- 文档临时词库：对当前文件分词，将匹配的词作为候选项补充
+- 文档词库支持方言模糊匹配：n/ng 不分（pin≈ping）、平翘舌不分（mosi≈moshi）
+- 新增 Unix socket 客户端-服务端模式
+  - `--listen-unix [socket_path]`: 服务端监听 Unix socket
+  - `--connect [socket_path]`: 客户端连接模式，通过 stdio 与 LSP 通信
+  - 多编辑器可共享单一 rime-ls 实例，只需维护一个 Rime 配置目录
+  - 客户端发现服务端未启动时，自动在后台启动服务端并连接
+- 移除候选项 label 中的 filter_text 显示
+
 # v0.4.3
 
 ## Fix

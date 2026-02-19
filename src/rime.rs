@@ -18,9 +18,9 @@ macro_rules! rime_call {
     ( $api_struct:ident -> $api_fn:ident $(, $arg:expr)* ) => {
         {
             let api = unsafe { *$api_struct };
-            let api_fn = api.$api_fn.expect(
-                format!("missing api function: {}", stringify!($api_fn)).as_str()
-            );
+            let api_fn = api.$api_fn.unwrap_or_else(|| {
+                panic!("missing api function: {}", stringify!($api_fn))
+            });
             unsafe { api_fn($($arg),*) }
         }
     };
@@ -51,6 +51,11 @@ impl Candidate {
     }
     fn from_text(text: String) -> Candidate {
         Self::new(text, None, None)
+    }
+
+    /// Create a candidate with custom order (e.g. for document dict, use 0 to prioritize).
+    pub fn from_text_with_order(text: String, order: usize) -> Candidate {
+        Self::new(text, None, Some(order))
     }
 }
 
@@ -292,27 +297,66 @@ impl Rime {
         rime_call!(api->sync_user_data);
         rime_call!(api->join_maintenance_thread);
     }
+
+    /// Deploy Rime: rebuild dictionaries and reload config after user_data_dir changes.
+    pub fn deploy(&self) {
+        let api = Self::get_api();
+        rime_call!(api->start_maintenance, 1); // full_check = 1
+        rime_call!(api->join_maintenance_thread);
+    }
+
+    /// Convert pinyin string to Chinese character candidates using Rime.
+    /// Caller must ensure Rime is initialized (e.g. via init from rime-ls config).
+    /// Returns empty vec if Rime is not initialized or on error; caller should
+    /// then use the original pattern only.
+    pub fn pinyin_to_candidates(pinyin: &str) -> Vec<String> {
+        if pinyin.is_empty() {
+            return vec![];
+        }
+        let rime = match RIME.get() {
+            Some(r) => r,
+            None => return vec![],
+        };
+        let session_id = rime.create_session();
+        rime.process_str(session_id, pinyin);
+        let out = rime.get_response_from_session(session_id).map(|res| {
+            res.candidates.into_iter().map(|c| c.text).collect::<Vec<_>>()
+        });
+        rime.destroy_session(session_id);
+        out.unwrap_or_default()
+    }
 }
 
 #[test]
-fn test_get_candidates() {
+fn test_get_candidates_and_pinyin_to_candidates() {
     let shared_data_dir = crate::utils::rime_default_shared_data_dir();
     let temp_dir = std::env::temp_dir();
     let temp_dir = temp_dir.to_str().unwrap();
 
-    // init
     Rime::init(shared_data_dir, temp_dir, temp_dir).unwrap();
     let rime = Rime::global();
-    // simulate typing
+
+    // get_response_from_session behavior
     let keys = vec![b'w', b'l', b'h'];
     let session_id = rime.create_session();
     for key in keys {
         rime.process_key(session_id, key as i32);
     }
     let res = rime.get_response_from_session(session_id).unwrap();
-    assert!(res.candidates.len() != 0);
+    assert!(!res.candidates.is_empty());
     rime.destroy_session(session_id);
 
-    // destroy
+    // pinyin_to_candidates API
+    let candidates = Rime::pinyin_to_candidates("nihao");
+    assert!(
+        !candidates.is_empty(),
+        "pinyin_to_candidates(\"nihao\") should return at least one candidate (e.g. 你好)"
+    );
+    assert!(
+        candidates.contains(&"你好".to_string()),
+        "pinyin_to_candidates(\"nihao\") should contain 你好, got {:?}",
+        candidates
+    );
+
     rime.destroy();
 }

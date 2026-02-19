@@ -318,20 +318,7 @@ end
 
 ### 五笔或者双形用户
 
-确保 `max_token` 为最大码长，`always_incomplete` 为 `true`，这样可以保证每次输入都会重新生成候选词。
-
-```lua
-require('lspconfig').rime_ls.setup {
-  init_options = {
-    -- ...
-    max_tokens = 4, -- 强制在删除到4字的时候重建一次候选词，避免用退格造成的空列表的问题
-    always_incomplete = true, -- 将 incomplete 永远设为 true，防止任何时候的过滤代替候选词重建
-    -- ...
-  },
-  on_attach = rime_on_attach,
-  capabilities = capabilities,
-}
-```
+在 `~/.config/rime-ls/config.yaml` 中设置 `max_tokens` 为最大码长，`always_incomplete` 为 `true`，这样可以保证每次输入都会重新生成候选词。
 
 #### 顶字上屏
 

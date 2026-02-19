@@ -2,18 +2,15 @@
 
 在此给出一些 `blink.cmp` 的相关配置注意事项（以 `blink.cmp v0.8.0` 为例）：
 
-- [开启 long_filter_text](#开启-long_filter_text)
 - [修改默认的 LSP 过滤规则](#修改默认的-lsp-过滤规则)
 - [还原输入法体验](#还原输入法体验)
   - [选词功能](#选词功能)
   - [五笔或者双形用户](#五笔或者双形用户)
     - [顶字上屏](#顶字上屏)
 
-## 开启 long_filter_text
-
-`blink.cmp` 对于候选词的过滤比较严格，需要将 rime-ls 的 `long_filter_text` 配置设置为 `true`。
-
 ## 修改默认的 LSP 过滤规则
+
+`blink.cmp` 对于候选词的过滤比较严格，需在 `~/.config/rime-ls/config.yaml` 中设置 `long_filter_text: true`。
 
 `blink.cmp` 将 LSP 服务器提供的 Text 类型补全也过滤掉了，为了启用 rime-ls，需要修改相关配置:
 
@@ -143,19 +140,7 @@ keymap = {
 
 ### 五笔或者双形用户
 
-确保 `always_incomplete` 为 `true`，这样可以保证每次输入都会重新生成候选词。
-
-```lua
-require('lspconfig').rime_ls.setup {
-  init_options = {
-    -- ...
-    always_incomplete = true, -- 将 incomplete 永远设为 true，防止任何时候的过滤代替候选词重建
-    -- ...
-  },
-  on_attach = rime_on_attach,
-  capabilities = capabilities,
-}
-```
+在 `~/.config/rime-ls/config.yaml` 中设置 `always_incomplete: true`，这样可以保证每次输入都会重新生成候选词。
 
 #### 顶字上屏
 

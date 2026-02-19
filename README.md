@@ -1,22 +1,19 @@
 # rime-ls
 
-> A language server that provides input method functionality using librime.
-
 为 rime 输入法核心库 [librime](https://github.com/rime/librime) 的主要功能实现 LSP 协议，
 从而将编辑器的代码补全功能当作输入法使用。
 
-项目还处在**早期阶段**
 
-目标是提供 rime + LSP 的通用解决方案, 在不同编辑器内实现与其他 rime 前端类似的输入体验，
-解决 vim 编辑模式下的输入法冲突和切换问题。
+目标是提供 rime + LSP 的通用解决方案, 在不同编辑器内实现与其他 rime 前端类似的输入体验，解决 vim 编辑模式下的输入法冲突和切换问题。
 
 主要使用场景:
-
+主要使用场景:
+在VIM编辑moshi
 - 在 vim 编辑模式下写 markdown, $\LaTeX$ 等文档（更像输入法）
 - 在编程时输入特殊的变量名或者写注释（更像代码补全）
-
+shuru 
 ## Features
-
+输入 候选词 翻页 文档临时库 
 - 用 rime 能输入的东西按理说都能输入 ( 汉字, 标点, emoji ...)
 - 支持按数字选择补全项
 - 支持候选词翻页
@@ -25,8 +22,9 @@
   - 平时关闭, 检测到配置的特殊字符或光标前有非英文字符时触发补全 (少量输入)
 - 可以按配置其他 rime 输入法的方式去配置 (只有能影响候选项的配置是有用的)
 - 可以同步系统中已有 rime 输入法的词频
+- **文档临时词库**：对当前文件分词，将文档中的词作为候选项补充；支持四川等地方言模糊匹配（pin≈ping、mosi≈moshi）
 - 无需图形界面，可在远程登录服务器时使用
-- 可以通过 TCP 远程使用 (无任何加密，谨慎使用) (since v0.1.3)
+- 客户端-服务端模式：多编辑器共享单一 Rime 实例，服务端未启动时客户端自动拉起；**服务端以 daemon 模式常驻，client 退出后 server 继续运行**
 
 效果展示：
 
@@ -39,11 +37,12 @@ https://user-images.githubusercontent.com/14821247/213079440-f0ab2ddd-5e44-4e41-
 > [!WARNING]
 > 第一次启动时 rime 需要做大量工作, 可能会很慢
 
-### 直接使用
+> [!NOTE]
+> 仅支持 Unix/Linux/macOS。Windows 需使用其他方式。
 
 1. 下载 Release / 自己从源码编译 / 包管理器安装
-2. 创建一个专属 rime-ls 的 rime 配置目录
-3. 配置 LSP 客戶端, 例如:
+2. 在 `~/.config/rime-ls/config.yaml` 配置 Rime 目录（见 [Configuration](#configuration)）
+3. 配置 LSP 客户端，将启动命令设为 `rime_ls --connect`：
    - [Neovim](doc/nvim.md)
    - [Vim + coc.nvim](doc/vim.md)
    - [Vscode](doc/vscode.md)
@@ -51,43 +50,70 @@ https://user-images.githubusercontent.com/14821247/213079440-f0ab2ddd-5e44-4e41-
    - [Zed](doc/zed.md)
 4. 像配置其他 Rime 输入法一样在 rime-ls 的用户配置目录进行配置
 5. 輸入拼音, 就可以看到补全提示
-6. 可以通过修改 rime-ls 的配置项控制补全行为
 
-### 通过容器使用
-
-1. 下载或自行编译 rime-ls 的 docker 镜像，例如 `docker pull ghcr.io/wlh320/rime-ls:master`
-2. 根据使用需求参考 docker-compose.yaml 以合适的参数运行容器
-3. 其他同上。注意配置客户端时需要使用容器内部的路径
-
-> [!TIP]
-> 容器中不包含 Rime 内置输入方案的数据。使用时可以根据需要映射到 `/usr/share/rime-data` 目录，
-> 或者使用 [rime-ice](https://github.com/iDvel/rime-ice/releases/tag/nightly)
-> 等不依赖 Rime 内置输入方案的方案。
+客户端连接时若服务端未运行，会自动在后台启动服务端。多编辑器共享单一 Rime 实例，只需维护一个配置目录。服务端以 daemon 模式常驻，即使所有 client 退出，server 也不会自动退出，下次连接时直接复用。
 
 ## Configuration
 
-所有可配置项及其默认值（以 json 为例）:
+请在 `~/.config/rime-ls/config.yaml` 中配置。
 
-```jsonc
-{
-  "initializationOptions": {
-    "enabled": true, // 是否启用
-    "shared_data_dir": "/usr/share/rime-data", // 指定 rime 共享文件夹
-    "user_data_dir": "~/.local/share/rime-ls", // 指定 rime 用户文件夹，最好别与其他 rime 前端共用
-    "log_dir": "~/.local/share/rime-ls", // 指定 rime 日志文件夹
-    "max_candidates": 9, // [v0.2.0 后不再有用] 与 rime 的候选数量配置最好保持一致
-    "trigger_characters": [], // 为空表示全局开启，否则列表内字符后面的内容才会触发补全
-    "schema_trigger_character": "&", // [since v0.2.0] 当输入此字符串时请求补全会触发 “方案选单”
-    "paging_characters": [",", ".", "-", "="], // [since v0.2.4] 输入这些符号会强制触发一次补全，可用于翻页 见 issue #13
-    "max_tokens": 0, // [since v0.2.0] 大于 0 表示会在删除到这个字符个数的时候，重建所有候选词，而不使用删除字符操作，见 pr #7
-    "always_incomplete": false, // [since v0.2.0] true 强制补全永远刷新整个列表，而不是使用过滤，见 pr #7
-    "preselect_first": false, // [since v0.2.3] 是否默认选择第一个候选项
-    "long_filter_text": false, // [since v0.3.0] 使用更长的 filter_text，某些编辑器如 helix/zed 连续补全需要设置 true
-    "show_filter_text_in_label": false, // [since v0.3.0] 在候选项的 label 中显示 filter_text，某些编辑器如 zed 需要设置 true
-    "show_order_in_label": true // [since v0.4.0] 在候选项的 label 中显示数字
-  }
-}
+### 服务端配置文件
+
+在 `~/.config/rime-ls/config.yaml` 中配置（Linux 下 `$XDG_CONFIG_HOME/rime-ls/config.yaml`，默认 `~/.config/rime-ls/config.yaml`）：
+
+```yaml
+shared_data_dir: "/usr/share/rime-data"
+user_data_dir: "~/.local/share/rime-ls"
+log_dir: "~/.local/share/rime-ls"
+max_candidates: 9
+trigger_characters: []
+schema_trigger_character: "&"
+max_tokens: 4
+always_incomplete: true
+long_filter_text: true
+hide_paging_characters: true
+auto_commit_on_select: true
+prefer_english_match: true
+# 文档临时词库
+document_dict: true
+document_dict_max_candidates: 5
+document_dict_fuzzy_n_ng: true  # 四川等地方言：pin≈ping、mosi≈moshi
 ```
+
+以上配置项均在 `~/.config/rime-ls/config.yaml` 中设置，不建议在 LSP 客户端的 `initializationOptions` 中配置。
+
+### 文档临时词库
+
+启用 `document_dict` 后，rime-ls 会对当前编辑的文件做中文分词，将文档中出现的词作为候选项的补充来源。输入拼音时，若文档中的词与之匹配，会优先出现在候选项中，便于输入当前文档的专有名词、重复词汇等。
+
+- **方言模糊匹配**：`document_dict_fuzzy_n_ng: true` 时支持：
+  - n/ng 不分：pin≈ping、san≈sang
+  - 平翘舌不分：mosi≈moshi（模式）、zhi≈zi
+
+### 配置项说明
+
+| 配置项 | 说明 |
+|--------|------|
+| `enabled` | 是否启用 |
+| `shared_data_dir` | rime 共享文件夹 |
+| `user_data_dir` | rime 用户文件夹，最好别与其他 rime 前端共用 |
+| `log_dir` | rime 及 rime-ls 日志文件夹，rime-ls 日志写入 `rime-ls.log` |
+| `max_candidates` | 候选数量，与 rime 的候选数量配置最好保持一致 |
+| `trigger_characters` | 为空表示全局开启，否则列表内字符后面的内容才会触发补全 |
+| `schema_trigger_character` | 当输入此字符串时请求补全会触发「方案选单」 |
+| `paging_characters` | 输入这些符号会强制触发一次补全，可用于翻页 |
+| `max_tokens` | 大于 0 时，删除到此字符个数会重建所有候选词 |
+| `always_incomplete` | true 强制补全永远刷新整个列表 |
+| `preselect_first` | 是否默认选择第一个候选项 |
+| `long_filter_text` | 使用更长的 filter_text，helix/zed 连续补全需设置 true |
+| `show_order_in_label` | 在候选项的 label 中显示数字 |
+| `show_comment` | 是否在候选项中显示注释（如拼音），设为 false 可隐藏 |
+| `hide_paging_characters` | 翻页时移除翻页字符，避免显示在文本中 |
+| `auto_commit_on_select` | 数字选词后自动上屏，减少需要额外确认的情况 |
+| `prefer_english_match` | 当拼音与英文单词完全匹配时，将该英文候选排到第一位（默认 true） |
+| `document_dict` | 是否启用文档临时词库：对当前文件分词，将匹配的词作为候选项补充（默认 true） |
+| `document_dict_max_candidates` | 文档词库最多补充的候选数量（默认 5） |
+| `document_dict_fuzzy_n_ng` | 是否模糊匹配，适配四川等地方言：n/ng 不分（pin≈ping）、平翘舌不分（mosi≈moshi）（默认 true） |
 
 ## Build
 
@@ -200,6 +226,12 @@ https://user-images.githubusercontent.com/14821247/213079440-f0ab2ddd-5e44-4e41-
 1. 为什么默认补全繁体中文？怎么修改候选个数？
 
    答：这部分由 Rime 负责，参考 [Rime 的帮助文档](https://rime.im/docs/)。推荐对 Rime 有初步了解后再使用本软件。
+
+2. 如何实现「输入拼音时若字母匹配英文单词，默认输入英文」？
+
+   答：需要两步配合：
+   - **Rime 配置**：确保 Rime 方案能输出英文候选。可在用户目录的 `luna_pinyin.custom.yaml` 中通过 `patch` 配置 `custom_phrase`，添加常用英文词（格式：`编码\t候选词\t权重`，如 `hello	hello	1`）。参考 [Rime 定製指南](https://github.com/rime/home/wiki/CustomizationGuide)。
+   - **rime-ls 配置**：`prefer_english_match: true`（默认开启）会在候选列表中将与输入完全匹配的英文词排到第一位。
 
 2. 某个编辑器不能用/不好用
 

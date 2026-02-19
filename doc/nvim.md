@@ -4,7 +4,6 @@
 
 - [使用其他用户开发的插件](#使用其他用户开发的插件)
 - [初始化 rime-ls](#初始化-rime-ls)
-- [通过 TCP 远程使用](#通过-tcp-远程使用)
 - [状态栏显示](#状态栏显示)
 - [特定 buffer 无法使用问题](#特定-buffer-无法使用问题)
 - [v0.10.2 后偶尔无法补全的问题](#v0.10.2-后偶尔无法补全的问题)
@@ -22,10 +21,20 @@
 
 ## 初始化 rime-ls
 
+将 LSP 的 `cmd` 设为 `rime_ls --connect`。若服务端未运行，客户端会自动在后台启动。
+
 ### 使用 vim.lsp.config
 
 如果你使用 nvim 0.11 及之后版本，你可以在配置目录下创建 `lsp/rime_ls.lua` 配置，
 然后用 `vim.lsp.enable('rime_ls')` 启用 rime_ls
+
+```lua
+cmd = {"rime_ls", "--connect"}
+-- 或指定 socket 路径
+cmd = {"rime_ls", "--connect", "/tmp/rime-ls.sock"}
+```
+
+默认 socket 路径为 `$XDG_RUNTIME_DIR/rime-ls.sock`，若未设置则为 `~/.local/run/rime-ls.sock`。
 
 文件的内容可以参考[作者的配置](https://github.com/wlh320/wlh-dotfiles/blob/aa9be6ffbe587452a42520626befc10ed5a614b8/config/nvim/lsp/rime_ls.lua#L1)
 
@@ -36,19 +45,10 @@
 基于 lspconfig 全局开启 rime-ls：
 
 可以参考[作者的配置](https://github.com/wlh320/wlh-dotfiles/blob/1a26b72172368de2895a3bd21ce94b7b17a9da38/config/nvim/lua/rime.lua#L3)
-给 nvim-lspconfig 添加一个 custom server
+给 nvim-lspconfig 添加一个 custom server，将 `cmd` 设为 `{"rime_ls", "--connect"}`
 
 上述代码定义了一个 `setup_rime()` 函数，在配置 lspconfig 的位置手动调用一下，
 即可为全部 buffer 开启该服务，用一个全局变量 `vim.g.rime_enabled` 做开关控制是否真正使用。
-
-## 通过 TCP 远程使用
-
-在本机开多个 nvim 进程时会随之开启多个 rime-ls 进程，由于 rime 会给数据库加锁导致不能同时使用。
-为了不产生冲突，可以只开一个 rime-ls 进程，不同客户端通过 TCP 远程使用。
-
-需要 rime_ls 以 TCP 模式运行: `rime_ls --listen <bind_addr>`
-
-客户端在上述初始化代码中将运行命令修改为 `cmd = vim.lsp.rpc.connect('<ip>', <port>)`。
 
 
 ## 状态栏显示
